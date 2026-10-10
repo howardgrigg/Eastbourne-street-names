@@ -159,3 +159,81 @@ export function overpassToContext(json, bbox, highwayTypes) {
 function inBox([lat, lon], [s, w, n, e]) {
   return lat >= s && lat <= n && lon >= w && lon <= e;
 }
+
+// ---------- Sea from coastline ----------
+// OSM coastlines run with the land on the left and the sea on the right.
+// Join the clipped pieces into chains, then close each chain off along the
+// edge of the box (walking clockwise, which keeps the sea on the right) to
+// get sea polygons. Closed rings are islands.
+export function buildSea(coastPieces, bbox) {
+  const [s, w, n, e] = bbox;
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+
+  // Join pieces end-to-start into chains.
+  const pieces = coastPieces.map((p) => p.slice());
+  const chains = [];
+  while (pieces.length) {
+    let chain = pieces.pop();
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i];
+        if (same(chain[chain.length - 1], p[0])) { chain = chain.concat(p.slice(1)); }
+        else if (same(p[p.length - 1], chain[0])) { chain = p.concat(chain.slice(1)); }
+        else continue;
+        pieces.splice(i, 1);
+        grew = true;
+        break;
+      }
+    }
+    chains.push(chain);
+  }
+
+  const eps = 1e-5;
+  // Position around the box, clockwise from the north-west corner: 0..4.
+  const perim = ([lat, lon]) => {
+    if (Math.abs(lat - n) < eps) return (lon - w) / (e - w);
+    if (Math.abs(lon - e) < eps) return 1 + (n - lat) / (n - s);
+    if (Math.abs(lat - s) < eps) return 2 + (e - lon) / (e - w);
+    if (Math.abs(lon - w) < eps) return 3 + (lat - s) / (n - s);
+    return null;
+  };
+  const corners = [[n, w], [n, e], [s, e], [s, w]]; // at t = 0(4), 1, 2, 3
+
+  const islands = [];
+  const open = [];
+  for (const c of chains) {
+    if (c.length > 2 && same(c[0], c[c.length - 1])) { islands.push(c); continue; }
+    const t0 = perim(c[0]);
+    const t1 = perim(c[c.length - 1]);
+    if (t0 === null || t1 === null) continue; // dangling piece, can't close it
+    open.push({ pts: c, t0, t1 });
+  }
+
+  const sea = [];
+  const unused = new Set(open);
+  while (unused.size) {
+    const first = unused.values().next().value;
+    unused.delete(first);
+    const ring = first.pts.slice();
+    let cur = first;
+    for (let guard = 0; guard <= open.length; guard++) {
+      // Next chain start met walking clockwise from where this one ends.
+      let next = null;
+      let bestDelta = Infinity;
+      for (const c of [first, ...unused]) {
+        let delta = (c.t0 - cur.t1 + 4) % 4;
+        if (delta < 1e-9 && c === cur) delta = 4;
+        if (delta < bestDelta) { bestDelta = delta; next = c; }
+      }
+      for (let k = Math.floor(cur.t1) + 1; k <= cur.t1 + bestDelta; k++) ring.push(corners[k % 4]);
+      if (next === first) break;
+      ring.push(...next.pts);
+      unused.delete(next);
+      cur = next;
+    }
+    sea.push(ring);
+  }
+  return { sea, islands };
+}

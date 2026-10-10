@@ -3,7 +3,7 @@ import {
   AREAS, DEFAULT_AREA, HIGHWAY_TYPES, BASEMAPS,
   SNAP_DISTANCE_MOUSE, SNAP_DISTANCE_TOUCH,
 } from './config.js?v=dev';
-import { fetchStreetsFromOverpass } from './osm.js?v=dev';
+import { fetchStreetsFromOverpass, buildSea } from './osm.js?v=dev';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -56,6 +56,7 @@ const contextLayer = L.layerGroup();
 const basemapLayers = {};
 for (const [key, b] of Object.entries(BASEMAPS)) {
   basemapLayers[key] = L.layerGroup(b.tiles.map((t) => L.tileLayer(t.url, t.options)));
+  if (b.attribution) basemapLayers[key].getAttribution = () => b.attribution;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = b.label;
@@ -106,6 +107,21 @@ async function loadContext() {
     const renderer = L.canvas({ pane: 'context', padding: 0.5 });
     const opts = { renderer, pane: 'context', interactive: false };
     const layers = [];
+    const LAND = '#f1eee8';
+    const SEA = '#b4d3e6';
+    // Grey out everything beyond the play area.
+    // Use the box the data was downloaded for, in case config has changed since.
+    const box = ctx.bbox || area.bbox;
+    const [s, w, n, e] = box;
+    layers.push(L.polygon([
+      [[-85, -180], [85, -180], [85, 180], [-85, 180]],
+      [[s, w], [n, w], [n, e], [s, e]],
+    ], { ...opts, stroke: false, fillColor: '#d9d6d0', fillOpacity: 1 }));
+    if (ctx.coast && ctx.coast.length) {
+      const { sea, islands } = buildSea(ctx.coast, box);
+      if (sea.length) layers.push(L.polygon(sea.map((r) => [r]), { ...opts, stroke: false, fillColor: SEA, fillOpacity: 1 }));
+      if (islands.length) layers.push(L.polygon(islands.map((r) => [r]), { ...opts, stroke: false, fillColor: LAND, fillOpacity: 1 }));
+    }
     if (ctx.water && ctx.water.length) layers.push(L.polygon(ctx.water.map((r) => [r]), { ...opts, stroke: false, fillColor: '#a9cfe3', fillOpacity: 1 }));
     if (ctx.buildings && ctx.buildings.length) layers.push(L.polygon(ctx.buildings.map((r) => [r]), { ...opts, color: '#b9aea3', weight: 0.6, fillColor: '#d8cfc6', fillOpacity: 0.9 }));
     if (ctx.roads && ctx.roads.length) layers.push(L.polyline(ctx.roads, { ...opts, color: '#a39d94', weight: 2, opacity: 0.9 }));

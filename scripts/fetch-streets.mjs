@@ -49,7 +49,7 @@ for (const key of keys) {
     console.log(`${key}: downloading background (coastline, buildings, paths)`);
     const json = await overpassRequest(buildContextQuery(area.bbox), requestOptions);
     const ctx = overpassToContext(json, area.bbox, HIGHWAY_TYPES);
-    await writeFile(new URL(`context-${key}.json`, dataDir), JSON.stringify(ctx));
+    await writeFile(new URL(`context-${key}.json`, dataDir), JSON.stringify({ bbox: area.bbox, ...ctx }));
     console.log(`${key}: ${ctx.buildings.length} buildings, ${ctx.roads.length} other roads, ${ctx.paths.length} paths, ${ctx.coast.length} coastline pieces`);
   } catch (err) {
     console.error(`${key}: background failed - ${err.message}`);
