@@ -27,7 +27,8 @@ export const HIGHWAY_TYPES = [
 // Backgrounds without any labels on them. Most map tile services bake street
 // names into their pictures, so "Map" is drawn by the game itself from
 // OpenStreetMap (coastline, buildings, paths - see data/context-*.json) on top
-// of label-free terrain shading.
+// of label-free terrain shading. (Esri's separate hillshade layer is left out:
+// it shows "data not available" over the sea.)
 const OSM_CREDIT = 'Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 export const BASEMAPS = {
   map: {
@@ -36,11 +37,7 @@ export const BASEMAPS = {
     tiles: [
       {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
-        options: { maxNativeZoom: 13, maxZoom: 19, opacity: 0.55, attribution: `Terrain &copy; Esri | ${OSM_CREDIT}` },
-      },
-      {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
-        options: { maxNativeZoom: 16, maxZoom: 19, opacity: 0.3, className: 'hillshade' },
+        options: { maxNativeZoom: 13, maxZoom: 19, opacity: 0.7, attribution: `Terrain &copy; Esri | ${OSM_CREDIT}` },
       },
     ],
   },

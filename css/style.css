@@ -65,7 +65,6 @@ select {
 
 .map { flex: 1; min-width: 0; background: #dfe7ea; }
 .map[data-basemap="map"] { background: #f1eee8; }
-.hillshade { mix-blend-mode: multiply; }
 
 .panel {
   width: 340px;
@@ -160,6 +159,21 @@ button:disabled { opacity: .45; cursor: default; }
   -webkit-user-select: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
 }
+.map[data-label-size="small"] .map-label { font-size: 10px; padding: 0 5px; }
+.map[data-label-size="medium"] .map-label { font-size: 11px; }
+
+/* Labels that don't fit shrink to a dot; hover or select to read them. */
+.map-label.collapsed {
+  font-size: 0 !important;
+  padding: 0 !important;
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+.map-label.collapsed > * { display: none; }
+.label-anchor:hover { z-index: 100000 !important; }
+.map-label.collapsed:hover { font-size: 12px !important; padding: 1px 7px !important; width: auto; height: auto; }
+.map-label.collapsed:hover > * { display: inline; }
 .map-label.selected { background: var(--chip-selected); border-color: #d9a300; }
 .map-label.dragging { opacity: .3; }
 .map-label.correct { border-color: var(--good); background: #e6f5ec; cursor: default; }

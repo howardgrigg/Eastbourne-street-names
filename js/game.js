@@ -34,6 +34,7 @@ const COLORS = {
 // ---------- State ----------
 let streets = [];            // { name, lines, line, anchor, angle, marker }
 const placed = new Map();    // street index -> guessed name
+const labelPos = new Map();  // street index -> { latlng, angle } where its label sits
 let selected = null;         // { name, from: street index | null }
 let submitted = false;
 let revealed = false;
@@ -154,6 +155,27 @@ function computeAnchor(lines) {
   return { latlng: L.latLng(best.pts.length ? map.unproject(best.pts[0], ANGLE_ZOOM) : lines[0][0]), angle: 0 };
 }
 
+// The point on a street closest to where a name was dropped, and the street's
+// direction there, so labels sit where the player put them.
+function snapOnStreet(idx, latlng) {
+  const p = map.project(latlng, ANGLE_ZOOM);
+  let best = null;
+  for (const pts of streets[idx].pts) {
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const q = L.LineUtil.closestPointOnSegment(p, a, b);
+      const d = q.distanceTo(p);
+      if (!best || d < best.d) best = { d, q, a, b };
+    }
+  }
+  if (!best) return null;
+  let angle = (Math.atan2(best.b.y - best.a.y, best.b.x - best.a.x) * 180) / Math.PI;
+  if (angle > 90) angle -= 180;
+  if (angle < -90) angle += 180;
+  return { latlng: map.unproject(best.q, ANGLE_ZOOM), angle };
+}
+
 function projectedLines() {
   const zoom = map.getZoom();
   if (projCache.zoom !== zoom) {
@@ -187,11 +209,16 @@ function streetOf(name) {
   return null;
 }
 
-function place(name, idx) {
+function place(name, idx, latlng) {
   const from = streetOf(name);
-  if (from === idx) return;
+  if (latlng) {
+    const pos = snapOnStreet(idx, latlng);
+    if (pos) labelPos.set(idx, pos);
+  }
+  if (from === idx) { afterChange(); return; }
   const existing = placed.get(idx);
   if (from !== null) placed.delete(from);
+  if (from !== null && !existing) labelPos.delete(from);
   // Swap when moving a label from one street onto another labelled street.
   if (existing && from !== null) placed.set(from, existing);
   placed.set(idx, name);
@@ -200,7 +227,7 @@ function place(name, idx) {
 
 function unplace(name) {
   const from = streetOf(name);
-  if (from !== null) placed.delete(from);
+  if (from !== null) { placed.delete(from); labelPos.delete(from); }
   afterChange();
 }
 
@@ -212,7 +239,10 @@ function afterChange() {
 
 function save() {
   try {
-    const data = [...placed].map(([idx, name]) => [streets[idx].name, name]);
+    const data = [...placed].map(([idx, name]) => {
+      const pos = labelPos.get(idx);
+      return pos ? [streets[idx].name, name, pos.latlng.lat, pos.latlng.lng] : [streets[idx].name, name];
+    });
     localStorage.setItem(storageKey, JSON.stringify(data));
   } catch { /* storage unavailable */ }
 }
@@ -223,10 +253,14 @@ function restore() {
     const indexByName = new Map(streets.map((s, i) => [s.name, i]));
     const names = new Set(streets.map((s) => s.name));
     const used = new Set();
-    for (const [streetName, guess] of data) {
+    for (const [streetName, guess, lat, lng] of data) {
       const idx = indexByName.get(streetName);
       if (idx === undefined || !names.has(guess) || used.has(guess)) continue;
       placed.set(idx, guess);
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        const pos = snapOnStreet(idx, L.latLng(lat, lng));
+        if (pos) labelPos.set(idx, pos);
+      }
       used.add(guess);
     }
   } catch { /* ignore bad saved state */ }
@@ -325,9 +359,70 @@ function renderLabels() {
     el.className = `map-label ${content.cls}`;
     if (selected && selected.from === idx) el.classList.add('selected');
     if (content.html) el.innerHTML = content.html; else el.textContent = content.text;
-    el.style.transform = `translate(-50%, -50%) rotate(${s.angle}deg)`;
+    const pos = (placed.has(idx) && labelPos.get(idx)) || { latlng: s.anchor, angle: s.angle };
+    s.marker.setLatLng(pos.latlng);
+    s.marker.setZIndexOffset(selected && selected.from === idx ? 10000 : 0);
+    el.style.transform = `translate(-50%, -50%) rotate(${pos.angle}deg)`;
     el.style.touchAction = 'none';
+    s.labelAngle = pos.angle;
   });
+  layoutLabels();
+}
+
+// Corners of a label's rotated box, in screen pixels.
+function labelCorners(c, w, h, angleDeg) {
+  const a = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  return [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]
+    .map(([x, y]) => [c.x + x * cos - y * sin, c.y + x * sin + y * cos]);
+}
+
+// Separating-axis test for two convex quads.
+function boxesOverlap(p, q) {
+  for (const poly of [p, q]) {
+    for (let i = 0; i < 4; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % 4];
+      const nx = y2 - y1;
+      const ny = x1 - x2;
+      let pMin = Infinity; let pMax = -Infinity; let qMin = Infinity; let qMax = -Infinity;
+      for (const [x, y] of p) { const d = x * nx + y * ny; pMin = Math.min(pMin, d); pMax = Math.max(pMax, d); }
+      for (const [x, y] of q) { const d = x * nx + y * ny; qMin = Math.min(qMin, d); qMax = Math.max(qMax, d); }
+      if (pMax < qMin || qMax < pMin) return false;
+    }
+  }
+  return true;
+}
+
+// Like a real map: show as many names as fit, and shrink the rest to dots
+// (tap or hover a dot to read it, or zoom in). The selected label always shows,
+// then longer streets get first pick.
+function layoutLabels() {
+  const zoom = map.getZoom();
+  els.map.dataset.labelSize = zoom < 15 ? 'small' : zoom < 16 ? 'medium' : 'large';
+  const items = [];
+  streets.forEach((s, idx) => {
+    if (!s.marker) return;
+    const el = s.marker.getElement().firstChild;
+    el.classList.remove('collapsed');
+    items.push({ idx, el, s, selected: selected && selected.from === idx });
+  });
+  for (const it of items) {
+    it.w = it.el.offsetWidth + 4;
+    it.h = it.el.offsetHeight + 2;
+    it.c = map.latLngToContainerPoint(it.s.marker.getLatLng());
+  }
+  items.sort((a, b) => (b.selected - a.selected) || (b.s.length - a.s.length));
+  const shown = [];
+  for (const it of items) {
+    const box = labelCorners(it.c, it.w, it.h, it.s.labelAngle || 0);
+    if (!it.selected && shown.some((other) => boxesOverlap(box, other))) {
+      it.el.classList.add('collapsed');
+    } else {
+      shown.push(box);
+    }
+  }
 }
 
 function escapeHtml(s) {
@@ -365,7 +460,8 @@ function startPointer(ev, name, fromIdx, sourceEl) {
   const target = (x, y) => {
     if (overElement(els.map, x, y)) {
       const r = els.map.getBoundingClientRect();
-      return { kind: 'map', idx: nearestStreet(L.point(x - r.left, y - r.top), snap) };
+      const cp = L.point(x - r.left, y - r.top);
+      return { kind: 'map', idx: nearestStreet(cp, snap), latlng: map.containerPointToLatLng(cp) };
     }
     if (overElement(els.names.parentElement, x, y)) return { kind: 'list' };
     return { kind: 'none' };
@@ -405,7 +501,7 @@ function startPointer(ev, name, fromIdx, sourceEl) {
     setHover(null);
     if (e.type === 'pointercancel') { render(); return; }
     const t = target(e.clientX, e.clientY);
-    if (t.kind === 'map' && t.idx !== null) place(name, t.idx);
+    if (t.kind === 'map' && t.idx !== null) place(name, t.idx, t.latlng);
     else if (t.kind === 'list' && fromIdx !== null) unplace(name);
     else render();
   };
@@ -431,13 +527,13 @@ function tap(name, fromIdx) {
   render();
 }
 
-map.on('zoomend', renderStreets);
+map.on('zoomend', () => { renderStreets(); layoutLabels(); });
 
 map.on('click', (e) => {
   if (submitted || !selected) return;
   const snap = e.originalEvent && e.originalEvent.pointerType === 'mouse' ? SNAP_DISTANCE_MOUSE : SNAP_DISTANCE_TOUCH;
   const idx = nearestStreet(e.containerPoint, snap);
-  if (idx !== null) place(selected.name, idx);
+  if (idx !== null) place(selected.name, idx, e.latlng);
 });
 
 // Tapping empty space in the list while holding a placed label takes it off the map.
@@ -496,7 +592,9 @@ function submit() {
 }
 
 function retryWrong() {
-  for (const [idx, name] of [...placed]) if (streets[idx].name !== name) placed.delete(idx);
+  for (const [idx, name] of [...placed]) {
+    if (streets[idx].name !== name) { placed.delete(idx); labelPos.delete(idx); }
+  }
   submitted = false;
   revealed = false;
   els.result.hidden = true;
@@ -508,6 +606,7 @@ function retryWrong() {
 function resetAll() {
   if (placed.size && !submitted && !confirm('Take every name off the map and start again?')) return;
   placed.clear();
+  labelPos.clear();
   submitted = false;
   revealed = false;
   selected = null;
@@ -551,7 +650,10 @@ els.reset.addEventListener('click', resetAll);
   streets = data.filter((s) => !exclude.has(s.name)).map((s) => {
     const { latlng, angle } = computeAnchor(s.lines);
     const line = L.polyline(s.lines, { ...streetStyle(-1), interactive: false, lineCap: 'round' }).addTo(map);
-    return { name: s.name, lines: s.lines, line, anchor: latlng, angle, marker: null };
+    const pts = s.lines.map((l) => l.map((ll) => map.project(L.latLng(ll), ANGLE_ZOOM)));
+    let length = 0;
+    for (const p of pts) for (let i = 1; i < p.length; i++) length += p[i].distanceTo(p[i - 1]);
+    return { name: s.name, lines: s.lines, pts, length, line, anchor: latlng, angle, marker: null };
   });
   const streetBounds = L.featureGroup(streets.map((s) => s.line)).getBounds();
   map.setMinZoom(0);
