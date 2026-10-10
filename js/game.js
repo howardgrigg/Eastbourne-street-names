@@ -242,15 +242,22 @@ function renderList() {
   }
 }
 
+// Thinner lines when zoomed out so neighbouring streets don't merge.
+function lineWeight() {
+  const z = map.getZoom();
+  return z < 15 ? 3 : z < 16 ? 4 : z < 17 ? 5 : 7;
+}
+
 function streetStyle(idx) {
-  if (idx === hoverStreet) return { color: COLORS.hover, weight: 8, opacity: 0.95 };
+  const weight = lineWeight();
+  if (idx === hoverStreet) return { color: COLORS.hover, weight: weight + 3, opacity: 0.95 };
   if (submitted) {
     const guess = placed.get(idx);
-    if (guess === streets[idx].name) return { color: COLORS.good, weight: 6, opacity: 0.85 };
-    return { color: COLORS.bad, weight: 6, opacity: 0.85 };
+    if (guess === streets[idx].name) return { color: COLORS.good, weight, opacity: 0.85 };
+    return { color: COLORS.bad, weight, opacity: 0.85 };
   }
-  if (placed.has(idx)) return { color: COLORS.filled, weight: 6, opacity: 0.8 };
-  return { color: COLORS.street, weight: 6, opacity: 0.8 };
+  if (placed.has(idx)) return { color: COLORS.filled, weight, opacity: 0.85 };
+  return { color: COLORS.street, weight, opacity: 0.85 };
 }
 
 function renderStreets() {
@@ -400,6 +407,8 @@ function tap(name, fromIdx) {
   render();
 }
 
+map.on('zoomend', renderStreets);
+
 map.on('click', (e) => {
   if (submitted || !selected) return;
   const snap = e.originalEvent && e.originalEvent.pointerType === 'mouse' ? SNAP_DISTANCE_MOUSE : SNAP_DISTANCE_TOUCH;
@@ -514,11 +523,17 @@ els.reset.addEventListener('click', resetAll);
     return;
   }
   overlay.remove();
-  streets = data.map((s) => {
+  const exclude = new Set(area.exclude || []);
+  streets = data.filter((s) => !exclude.has(s.name)).map((s) => {
     const { latlng, angle } = computeAnchor(s.lines);
     const line = L.polyline(s.lines, { ...streetStyle(-1), interactive: false, lineCap: 'round' }).addTo(map);
     return { name: s.name, lines: s.lines, line, anchor: latlng, angle, marker: null };
   });
+  const streetBounds = L.featureGroup(streets.map((s) => s.line)).getBounds();
+  map.setMinZoom(0);
+  map.fitBounds(streetBounds, { padding: [12, 12] });
+  map.setMaxBounds(streetBounds.pad(0.5));
+  map.setMinZoom(Math.floor(map.getZoom()) - 1);
   restore();
   render();
 })();

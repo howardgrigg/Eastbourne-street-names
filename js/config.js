@@ -7,7 +7,12 @@ export const AREAS = {
   },
   bays: {
     label: 'Eastbourne + the Bays (from Point Howard)',
-    bbox: [-41.322, 174.885, -41.243, 174.925],
+    bbox: [-41.322, 174.885, -41.2495, 174.925],
+    // Seaview / Gracefield roads that clip the top of the box.
+    exclude: [
+      'Seaview Road', 'Wainuiomata Hill Road', 'Gracefield Road', 'Port Road',
+      'Toop Street', 'Meachen Street', 'Marchbanks Street',
+    ],
   },
 };
 
@@ -23,17 +28,18 @@ export const HIGHWAY_TYPES = [
 export const BASEMAPS = {
   map: {
     label: 'Map',
-    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
     options: {
-      subdomains: 'abcd',
-      maxZoom: 20,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxNativeZoom: 16,
+      maxZoom: 19,
+      attribution: 'Base map &copy; Esri, HERE, Garmin | Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     },
   },
   satellite: {
     label: 'Satellite',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     options: {
+      maxNativeZoom: 18,
       maxZoom: 19,
       attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics | Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     },

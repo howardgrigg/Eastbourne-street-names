@@ -14,7 +14,7 @@ had every street name removed, and you have to put them back.
   Eastbourne proper and Eastbourne + the Bays (Point Howard to Days Bay).
 
 Street data comes from [OpenStreetMap](https://www.openstreetmap.org/) via the Overpass API.
-The background map is CARTO's label-free "light_nolabels" style.
+The background map is Esri's label-free "World Light Gray Base".
 
 ## Playing / hosting it
 
@@ -50,5 +50,5 @@ the workflow do it).
 
 ## Credits
 
-Map data © OpenStreetMap contributors (ODbL). Map tiles © CARTO; imagery © Esri.
+Map data © OpenStreetMap contributors (ODbL). Base map and imagery © Esri.
 Built with [Leaflet](https://leafletjs.com/) (vendored in `vendor/leaflet`).
