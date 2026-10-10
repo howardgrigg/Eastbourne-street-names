@@ -41,6 +41,8 @@ jobs:
             git commit -m "Update street data from OpenStreetMap"
             git push
           fi
+      - name: Stamp file versions so browsers fetch the new copy
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html js/*.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

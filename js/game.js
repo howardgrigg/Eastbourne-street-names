@@ -2,8 +2,8 @@
 import {
   AREAS, DEFAULT_AREA, HIGHWAY_TYPES, BASEMAPS,
   SNAP_DISTANCE_MOUSE, SNAP_DISTANCE_TOUCH,
-} from './config.js';
-import { fetchStreetsFromOverpass } from './osm.js';
+} from './config.js?v=dev';
+import { fetchStreetsFromOverpass } from './osm.js?v=dev';
 
 const $ = (id) => document.getElementById(id);
 const els = {
