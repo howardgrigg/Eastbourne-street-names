@@ -1,0 +1,44 @@
+name: Deploy game to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  schedule:
+    # Refresh the street data from OpenStreetMap once a month.
+    - cron: '17 3 1 * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Download street data from OpenStreetMap
+        # If Overpass is down the game falls back to fetching live in the browser.
+        continue-on-error: true
+        run: node scripts/fetch-streets.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

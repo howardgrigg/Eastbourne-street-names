@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eastbourne Street Names</title>
+  <meta name="description" content="How well do you know Eastbourne? Put the street names back on the map.">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Eastbourne Street Names</h1>
+    <div class="controls">
+      <label class="area-picker">Area
+        <select id="area-select"></select>
+      </label>
+      <div class="basemap-toggle" id="basemap-toggle" role="group" aria-label="Background"></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div id="map" class="map" aria-label="Map of Eastbourne without street names"></div>
+
+    <aside class="panel">
+      <div class="status">
+        <div id="progress" class="progress">Loading streets&hellip;</div>
+        <div class="buttons">
+          <button id="submit-btn" class="primary" disabled>Submit</button>
+          <button id="reset-btn" class="ghost" disabled>Start over</button>
+        </div>
+      </div>
+
+      <div id="result" class="result" hidden></div>
+
+      <p id="help" class="help">
+        Drag each name onto its street. On a phone, tap a name and then tap the street.
+        Drag a placed name back here (or tap it, then tap this list) to take it off.
+      </p>
+
+      <ul id="names" class="names" aria-label="Street names"></ul>
+    </aside>
+  </main>
+
+  <div id="ghost" class="drag-ghost" hidden></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>

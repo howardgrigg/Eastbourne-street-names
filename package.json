@@ -1,0 +1,9 @@
+{
+  "name": "eastbourne-street-names",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch-data": "node scripts/fetch-streets.mjs",
+    "start": "npx serve ."
+  }
+}
