@@ -28,21 +28,23 @@ export const HIGHWAY_TYPES = [
 // (or "data not available" notices) into their pictures, so "Map" is drawn
 // entirely by the game from OpenStreetMap: sea, coastline, buildings and paths
 // (see data/context-*.json).
-const OSM_CREDIT = 'Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+// Credits are shown under the street list rather than on the map.
+const OSM_CREDIT = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 export const BASEMAPS = {
   map: {
     label: 'Map',
     drawContext: true,
     tiles: [],
-    attribution: OSM_CREDIT,
+    credit: OSM_CREDIT,
   },
   satellite: {
     label: 'Satellite',
     drawContext: false,
+    credit: `Imagery &copy; Esri, Maxar, Earthstar Geographics &middot; ${OSM_CREDIT}`,
     tiles: [
       {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        options: { maxNativeZoom: 18, maxZoom: 19, attribution: `Imagery &copy; Esri, Maxar, Earthstar Geographics | ${OSM_CREDIT}` },
+        options: { maxNativeZoom: 18, maxZoom: 19 },
       },
     ],
   },

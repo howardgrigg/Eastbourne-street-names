@@ -52,5 +52,6 @@ the workflow do it).
 
 ## Credits
 
-Map data © OpenStreetMap contributors (ODbL). Base map and imagery © Esri.
+Map data © OpenStreetMap contributors (ODbL). Satellite imagery © Esri. Credits are shown
+under the street list rather than on the map.
 Built with [Leaflet](https://leafletjs.com/) (vendored in `vendor/leaflet`).

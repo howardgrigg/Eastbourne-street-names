@@ -43,7 +43,7 @@ let projCache = { zoom: null, lines: [] };
 
 // ---------- Map ----------
 const bounds = L.latLngBounds([area.bbox[0], area.bbox[1]], [area.bbox[2], area.bbox[3]]);
-const map = L.map(els.map, { zoomSnap: 0.5, doubleClickZoom: false });
+const map = L.map(els.map, { zoomSnap: 0.5, doubleClickZoom: false, attributionControl: false });
 map.fitBounds(bounds);
 map.setMaxBounds(bounds.pad(0.6));
 map.setMinZoom(Math.floor(map.getZoom()) - 1);
@@ -56,7 +56,6 @@ const contextLayer = L.layerGroup();
 const basemapLayers = {};
 for (const [key, b] of Object.entries(BASEMAPS)) {
   basemapLayers[key] = L.layerGroup(b.tiles.map((t) => L.tileLayer(t.url, t.options)));
-  if (b.attribution) basemapLayers[key].getAttribution = () => b.attribution;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = b.label;
@@ -70,6 +69,7 @@ function setBasemap(key) {
   }
   if (BASEMAPS[key].drawContext) contextLayer.addTo(map); else contextLayer.remove();
   els.map.dataset.basemap = key;
+  $('credits').innerHTML = `${BASEMAPS[key].credit} &middot; Built with <a href="https://leafletjs.com/">Leaflet</a>`;
   for (const btn of els.basemapToggle.children) {
     btn.setAttribute('aria-pressed', String(btn.dataset.key === key));
   }

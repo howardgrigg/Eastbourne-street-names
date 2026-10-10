@@ -108,6 +108,15 @@ button:disabled { opacity: .45; cursor: default; }
   gap: 6px;
 }
 
+.credits {
+  margin: 0;
+  padding: 6px 14px 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .72rem;
+}
+.credits a { color: inherit; }
+
 .names.drop-target { outline: 3px dashed var(--accent); outline-offset: -6px; }
 
 .chip {
