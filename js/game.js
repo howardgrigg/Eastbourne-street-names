@@ -47,9 +47,14 @@ map.fitBounds(bounds);
 map.setMaxBounds(bounds.pad(0.6));
 map.setMinZoom(Math.floor(map.getZoom()) - 1);
 
+// Background drawn from OpenStreetMap, below the game's streets.
+map.createPane('context');
+map.getPane('context').style.zIndex = 350;
+const contextLayer = L.layerGroup();
+
 const basemapLayers = {};
 for (const [key, b] of Object.entries(BASEMAPS)) {
-  basemapLayers[key] = L.tileLayer(b.url, b.options);
+  basemapLayers[key] = L.layerGroup(b.tiles.map((t) => L.tileLayer(t.url, t.options)));
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = b.label;
@@ -61,6 +66,8 @@ function setBasemap(key) {
   for (const [k, layer] of Object.entries(basemapLayers)) {
     if (k === key) layer.addTo(map); else layer.remove();
   }
+  if (BASEMAPS[key].drawContext) contextLayer.addTo(map); else contextLayer.remove();
+  els.map.dataset.basemap = key;
   for (const btn of els.basemapToggle.children) {
     btn.setAttribute('aria-pressed', String(btn.dataset.key === key));
   }
@@ -88,6 +95,23 @@ async function loadStreets() {
   } catch { /* fall through to live data */ }
   els.progress.textContent = 'Fetching streets from OpenStreetMap…';
   return fetchStreetsFromOverpass(area.bbox, HIGHWAY_TYPES);
+}
+
+async function loadContext() {
+  try {
+    const res = await fetch(`data/context-${areaKey}.json`, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const ctx = await res.json();
+    const renderer = L.canvas({ pane: 'context', padding: 0.5 });
+    const opts = { renderer, pane: 'context', interactive: false };
+    const layers = [];
+    if (ctx.water && ctx.water.length) layers.push(L.polygon(ctx.water.map((r) => [r]), { ...opts, stroke: false, fillColor: '#a9cfe3', fillOpacity: 1 }));
+    if (ctx.buildings && ctx.buildings.length) layers.push(L.polygon(ctx.buildings.map((r) => [r]), { ...opts, color: '#b9aea3', weight: 0.6, fillColor: '#d8cfc6', fillOpacity: 0.9 }));
+    if (ctx.roads && ctx.roads.length) layers.push(L.polyline(ctx.roads, { ...opts, color: '#a39d94', weight: 2, opacity: 0.9 }));
+    if (ctx.paths && ctx.paths.length) layers.push(L.polyline(ctx.paths, { ...opts, color: '#8f8a82', weight: 1.2, dashArray: '3 4', opacity: 0.9 }));
+    if (ctx.coast && ctx.coast.length) layers.push(L.polyline(ctx.coast, { ...opts, color: '#3f88b5', weight: 3, opacity: 0.9 }));
+    for (const l of layers) contextLayer.addLayer(l);
+  } catch { /* background is optional */ }
 }
 
 function showOverlay(text) {
@@ -536,4 +560,5 @@ els.reset.addEventListener('click', resetAll);
   map.setMinZoom(Math.floor(map.getZoom()) - 1);
   restore();
   render();
+  loadContext();
 })();

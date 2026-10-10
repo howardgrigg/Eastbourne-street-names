@@ -14,7 +14,9 @@ had every street name removed, and you have to put them back.
   Eastbourne proper and Eastbourne + the Bays (Point Howard to Days Bay).
 
 Street data comes from [OpenStreetMap](https://www.openstreetmap.org/) via the Overpass API.
-The background map is Esri's label-free "World Light Gray Base".
+Map tile services bake street names into their images, so the "Map" background is
+drawn by the game itself from OpenStreetMap (coastline, buildings, unnamed lanes and
+paths) over Esri's label-free terrain shading. "Satellite" is Esri World Imagery.
 
 ## Playing / hosting it
 
@@ -28,7 +30,7 @@ month to pick up map changes). Send your friends the Pages URL.
 **Locally:**
 
 ```sh
-node scripts/fetch-streets.mjs   # optional: saves data/streets-*.json (needs Node 18+)
+node scripts/fetch-streets.mjs   # optional: saves data/streets-*.json and context-*.json (needs Node 18+)
 npx serve .                      # then open http://localhost:3000
 ```
 

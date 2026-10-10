@@ -64,6 +64,8 @@ select {
 .layout { flex: 1; display: flex; min-height: 0; }
 
 .map { flex: 1; min-width: 0; background: #dfe7ea; }
+.map[data-basemap="map"] { background: #f1eee8; }
+.hillshade { mix-blend-mode: multiply; }
 
 .panel {
   width: 340px;

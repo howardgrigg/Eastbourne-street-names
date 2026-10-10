@@ -75,9 +75,9 @@ export function overpassToStreets(json, bbox) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchStreetsFromOverpass(bbox, highwayTypes, options = {}) {
-  const { fetchImpl = fetch, headers = {}, rounds = 1, retryDelayMs = 0, log = () => {} } = options;
-  const query = buildQuery(bbox, highwayTypes);
+// POST a query to the Overpass servers in turn, retrying in rounds.
+export async function overpassRequest(query, options = {}) {
+  const { fetchImpl = fetch, headers = {}, rounds = 1, retryDelayMs = 0, log = () => {}, accept = () => true } = options;
   const errors = [];
   for (let round = 0; round < rounds; round++) {
     if (round > 0) {
@@ -92,9 +92,9 @@ export async function fetchStreetsFromOverpass(bbox, highwayTypes, options = {})
           body: 'data=' + encodeURIComponent(query),
         });
         if (!res.ok) throw new Error(`responded ${res.status} ${res.statusText}`.trim());
-        const streets = overpassToStreets(await res.json(), bbox);
-        if (!streets.length) throw new Error('returned no streets');
-        return streets;
+        const json = await res.json();
+        if (!accept(json)) throw new Error('returned no usable data');
+        return json;
       } catch (err) {
         const msg = `${url}: ${err.message}`;
         log(`  ${msg}`);
@@ -103,4 +103,59 @@ export async function fetchStreetsFromOverpass(bbox, highwayTypes, options = {})
     }
   }
   throw new Error(`all Overpass servers failed (${errors.join('; ')})`);
+}
+
+export async function fetchStreetsFromOverpass(bbox, highwayTypes, options = {}) {
+  let streets;
+  await overpassRequest(buildQuery(bbox, highwayTypes), {
+    ...options,
+    accept: (json) => (streets = overpassToStreets(json, bbox)).length > 0,
+  });
+  return streets;
+}
+
+// ---------- Background ("context") map ----------
+// Everything that helps people find their way without giving names away:
+// the coastline, buildings, and roads/paths that aren't part of the game.
+
+export function buildContextQuery(bbox) {
+  const b = bbox.join(',');
+  return `[out:json][timeout:120];
+(
+  way["natural"="coastline"](${b});
+  way["highway"](${b});
+  way["building"](${b});
+  way["natural"="water"](${b});
+);
+out geom;`;
+}
+
+const PATH_TYPES = new Set(['footway', 'path', 'steps', 'track', 'bridleway', 'cycleway', 'pedestrian']);
+const round5 = (v) => Math.round(v * 1e5) / 1e5;
+
+export function overpassToContext(json, bbox, highwayTypes) {
+  const gameTypes = new Set(highwayTypes);
+  const ctx = { coast: [], roads: [], paths: [], buildings: [], water: [] };
+  for (const el of json.elements || []) {
+    if (el.type !== 'way' || !el.geometry || !el.tags) continue;
+    const pts = el.geometry.filter(Boolean).map((p) => [round5(p.lat), round5(p.lon)]);
+    if (pts.length < 2) continue;
+    const t = el.tags;
+    if (t.building) {
+      if (pts.some((p) => inBox(p, bbox))) ctx.buildings.push(pts);
+    } else if (t.natural === 'water') {
+      ctx.water.push(pts);
+    } else if (t.natural === 'coastline') {
+      ctx.coast.push(...clipLine(pts, bbox));
+    } else if (t.highway) {
+      if (gameTypes.has(t.highway) && t.name) continue; // drawn by the game itself
+      const target = PATH_TYPES.has(t.highway) ? ctx.paths : ctx.roads;
+      target.push(...clipLine(pts, bbox));
+    }
+  }
+  return ctx;
+}
+
+function inBox([lat, lon], [s, w, n, e]) {
+  return lat >= s && lat <= n && lon >= w && lon <= e;
 }

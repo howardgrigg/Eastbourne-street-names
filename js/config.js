@@ -24,25 +24,35 @@ export const HIGHWAY_TYPES = [
   'residential', 'living_street', 'pedestrian', 'road',
 ];
 
-// Base maps without any labels on them.
+// Backgrounds without any labels on them. Most map tile services bake street
+// names into their pictures, so "Map" is drawn by the game itself from
+// OpenStreetMap (coastline, buildings, paths - see data/context-*.json) on top
+// of label-free terrain shading.
+const OSM_CREDIT = 'Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 export const BASEMAPS = {
   map: {
     label: 'Map',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    options: {
-      maxNativeZoom: 16,
-      maxZoom: 19,
-      attribution: 'Base map &copy; Esri, HERE, Garmin | Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
+    drawContext: true,
+    tiles: [
+      {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
+        options: { maxNativeZoom: 13, maxZoom: 19, opacity: 0.55, attribution: `Terrain &copy; Esri | ${OSM_CREDIT}` },
+      },
+      {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+        options: { maxNativeZoom: 16, maxZoom: 19, opacity: 0.3, className: 'hillshade' },
+      },
+    ],
   },
   satellite: {
     label: 'Satellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    options: {
-      maxNativeZoom: 18,
-      maxZoom: 19,
-      attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics | Streets &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
+    drawContext: false,
+    tiles: [
+      {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        options: { maxNativeZoom: 18, maxZoom: 19, attribution: `Imagery &copy; Esri, Maxar, Earthstar Geographics | ${OSM_CREDIT}` },
+      },
+    ],
   },
 };
 
