@@ -9,6 +9,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { AREAS, HIGHWAY_TYPES } from '../js/config.js';
 import { fetchStreetsFromOverpass } from '../js/osm.js';
 
+const USER_AGENT = 'eastbourne-street-names/1.0 (+https://github.com/howardgrigg/Eastbourne-street-names)';
 const dataDir = new URL('../data/', import.meta.url);
 await mkdir(dataDir, { recursive: true });
 
@@ -22,10 +23,19 @@ for (const key of keys) {
     continue;
   }
   try {
-    const streets = await fetchStreetsFromOverpass(area.bbox, HIGHWAY_TYPES);
+    console.log(`${key}: downloading`);
+    const streets = await fetchStreetsFromOverpass(area.bbox, HIGHWAY_TYPES, {
+      // Overpass rejects requests that don't say who they are.
+      headers: { 'User-Agent': USER_AGENT, Referer: 'https://github.com/howardgrigg/Eastbourne-street-names' },
+      rounds: 4,
+      retryDelayMs: 15000,
+      log: console.log,
+    });
     const out = { area: key, bbox: area.bbox, generated: new Date().toISOString(), streets };
     await writeFile(new URL(`streets-${key}.json`, dataDir), JSON.stringify(out));
     console.log(`${key}: ${streets.length} streets`);
+    // Be polite to the shared Overpass servers between areas.
+    await new Promise((r) => setTimeout(r, 5000));
   } catch (err) {
     console.error(`${key}: failed - ${err.message}`);
     failed = true;

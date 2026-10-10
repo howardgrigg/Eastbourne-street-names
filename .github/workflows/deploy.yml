@@ -9,7 +9,7 @@ on:
     - cron: '17 3 1 * *'
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -29,6 +29,18 @@ jobs:
         # If Overpass is down the game falls back to fetching live in the browser.
         continue-on-error: true
         run: node scripts/fetch-streets.mjs
+      - name: Save the street data in the repo
+        # Keeps a copy so the game still works if Overpass is down on a later run.
+        run: |
+          git add data/*.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No new street data to save"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Update street data from OpenStreetMap"
+            git push
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

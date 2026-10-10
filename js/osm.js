@@ -75,23 +75,32 @@ export function overpassToStreets(json, bbox) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchStreetsFromOverpass(bbox, highwayTypes, fetchImpl = fetch) {
+export async function fetchStreetsFromOverpass(bbox, highwayTypes, options = {}) {
+  const { fetchImpl = fetch, headers = {}, rounds = 1, retryDelayMs = 0, log = () => {} } = options;
   const query = buildQuery(bbox, highwayTypes);
-  let lastError;
-  for (const url of OVERPASS_ENDPOINTS) {
-    try {
-      const res = await fetchImpl(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query),
-      });
-      if (!res.ok) throw new Error(`${url} responded ${res.status}`);
-      const streets = overpassToStreets(await res.json(), bbox);
-      if (!streets.length) throw new Error(`${url} returned no streets`);
-      return streets;
-    } catch (err) {
-      lastError = err;
+  const errors = [];
+  for (let round = 0; round < rounds; round++) {
+    if (round > 0) {
+      log(`  waiting ${Math.round((retryDelayMs * round) / 1000)}s before retrying`);
+      await new Promise((r) => setTimeout(r, retryDelayMs * round));
+    }
+    for (const url of OVERPASS_ENDPOINTS) {
+      try {
+        const res = await fetchImpl(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+          body: 'data=' + encodeURIComponent(query),
+        });
+        if (!res.ok) throw new Error(`responded ${res.status} ${res.statusText}`.trim());
+        const streets = overpassToStreets(await res.json(), bbox);
+        if (!streets.length) throw new Error('returned no streets');
+        return streets;
+      } catch (err) {
+        const msg = `${url}: ${err.message}`;
+        log(`  ${msg}`);
+        errors.push(msg);
+      }
     }
   }
-  throw lastError;
+  throw new Error(`all Overpass servers failed (${errors.join('; ')})`);
 }
